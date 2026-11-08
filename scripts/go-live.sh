@@ -7,7 +7,12 @@ ZONE_ID=${1:?the zone ID, from the Overview page of trunkrecorder.pro in the Clo
 TRP=${TRP:-$HOME/Projects/trunk-recorder-lite}
 API=https://trunkrecorder.pro/corpus/api/v1
 
-gh repo create TrunkRecorder/trunk-recorder-corpus --public --source . --push --description "Public IQ recordings contributed from Trunk Recorder Pro"
+# (Wrangler's login expires and this renews it; a deploy that starts with an expired one fails with code 7403.)
+npx wrangler whoami > /dev/null
+
+# (It can be run again after stopping partway.)
+gh repo view TrunkRecorder/trunk-recorder-corpus > /dev/null 2>&1 || gh repo create TrunkRecorder/trunk-recorder-corpus --public --source . --description "Public IQ recordings contributed from Trunk Recorder Pro"
+git push -u origin main
 
 npm run deploy
 ADMIN=$(openssl rand -hex 32)

@@ -30,9 +30,14 @@ def call(method, url, data=None, headers=None):
     sys.exit(f"{url}: gave up")
 
 
+# (Run again after stopping partway: what's listed is done.)
+done = {s["note"] for s in call("GET", f"{api}/submissions")["submissions"]}
 token = call("POST", f"{api}/installs")["token"]
 auth = {"Authorization": f"Bearer {token}"}
 for entry in json.load(open(manifest))["captures"]:
+    if f"Reference capture: {entry['id']}" in done:
+        print(f"{entry['id']}: already listed", flush=True)
+        continue
     folder = pathlib.Path(root) / entry["id"]
     body = {"purpose": "healthy", "tier": entry["tier"], "protocol": entry["protocol"], "note": f"Reference capture: {entry['id']}", "files": [{k: f[k] for k in ("name", "sha256", "bytes")} for f in entry["files"]]}
     made = call("POST", f"{api}/submissions", json.dumps(body).encode(), {**auth, "Content-Type": "application/json"})

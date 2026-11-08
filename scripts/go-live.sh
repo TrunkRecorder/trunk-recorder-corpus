@@ -22,7 +22,7 @@ printf %s "$DECODE" | npx wrangler secret put DECODE_TOKEN
 gh secret set DECODE_TOKEN -R TrunkRecorder/trunk-recorder-corpus --body "$DECODE"
 gh secret set CORPUS_ADMIN_TOKEN -R TrunkRecorder/trunk-recorder-pro --body "$ADMIN"
 
-npx wrangler r2 bucket domain add trp-iq --domain iq.trunkrecorder.pro --zone-id "$ZONE_ID"
+npx wrangler r2 bucket domain list trp-iq | grep -q iq.trunkrecorder.pro || npx wrangler r2 bucket domain add trp-iq --domain iq.trunkrecorder.pro --zone-id "$ZONE_ID"
 
 DECODE_TOKEN=$DECODE python3 scripts/seed.py "$TRP/target/release/trunk-pro" "$TRP/corpus/corpus.json" "$TRP/captures/scenarios" "$API"
 

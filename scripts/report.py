@@ -9,7 +9,7 @@ out, url, token = pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3]
 
 
 def send(method, path, data, kind):
-    req = urllib.request.Request(url + path, data=data, method=method, headers={"Authorization": f"Bearer {token}", "Content-Type": kind})
+    req = urllib.request.Request(url + path, data=data, method=method, headers={"Authorization": f"Bearer {token}", "Content-Type": kind, "User-Agent": "trunk-recorder-corpus"})
     urllib.request.urlopen(req).read()
 
 

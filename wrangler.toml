@@ -1,0 +1,33 @@
+# trunkrecorder.pro/corpus: uploads of IQ recordings, and the public pages listing them.
+# See research/iq-corpus.md in TrunkRecorder/trunk-recorder-pro.
+
+name = "trunk-recorder-corpus"
+main = "src/worker.ts"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+routes = [{ pattern = "trunkrecorder.pro/corpus*", zone_name = "trunkrecorder.pro" }]
+
+[vars]
+REPO = "TrunkRecorder/trunk-recorder-corpus"
+MANIFEST_URL = "https://raw.githubusercontent.com/TrunkRecorder/trunk-recorder-pro/main/corpus/corpus.json"
+BLOB_URL = "https://iq.trunkrecorder.pro/blobs/"
+
+# `wrangler d1 create corpus`, and paste its id here.
+[[d1_databases]]
+binding = "DB"
+database_name = "corpus"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+# The recordings. Public, on the custom domain iq.trunkrecorder.pro.
+[[r2_buckets]]
+binding = "IQ"
+bucket_name = "trp-iq"
+
+# Retention: every day.
+[triggers]
+crons = ["17 4 * * *"]
+
+# Secrets (`wrangler secret put`): ADMIN_TOKEN (the corpus-remove workflow's) and
+# GH_DISPATCH_TOKEN (starts the decode job in this repo; only Actions: write).

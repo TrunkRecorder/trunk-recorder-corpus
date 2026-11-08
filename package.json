@@ -1,0 +1,22 @@
+{
+  "name": "trunk-recorder-corpus",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "trunkrecorder.pro/corpus: public IQ recordings contributed by Trunk Recorder Pro users.",
+  "license": "MIT",
+  "scripts": {
+    "dev": "wrangler d1 migrations apply corpus --local && wrangler dev",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.ts",
+    "test:local": "node scripts/e2e.mjs",
+    "check": "npm run typecheck && npm test && npm run test:local",
+    "deploy": "wrangler d1 migrations apply corpus --remote && wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261021.1",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.151.3"
+  }
+}

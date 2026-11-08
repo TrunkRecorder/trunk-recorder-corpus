@@ -12,11 +12,11 @@ routes = [{ pattern = "trunkrecorder.pro/corpus*", zone_name = "trunkrecorder.pr
 MANIFEST_URL = "https://raw.githubusercontent.com/TrunkRecorder/trunk-recorder-pro/main/corpus/corpus.json"
 BLOB_URL = "https://iq.trunkrecorder.pro/blobs/"
 
-# `wrangler d1 create corpus`, and paste its id here.
+# Made with `wrangler d1 create corpus`.
 [[d1_databases]]
 binding = "DB"
 database_name = "corpus"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "d1198978-cf81-46f5-b201-b4a1bcd37eb3"
 migrations_dir = "migrations"
 
 # The recordings. Public, on the custom domain iq.trunkrecorder.pro.

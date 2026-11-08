@@ -9,7 +9,6 @@ compatibility_flags = ["nodejs_compat"]
 routes = [{ pattern = "trunkrecorder.pro/corpus*", zone_name = "trunkrecorder.pro" }]
 
 [vars]
-REPO = "TrunkRecorder/trunk-recorder-corpus"
 MANIFEST_URL = "https://raw.githubusercontent.com/TrunkRecorder/trunk-recorder-pro/main/corpus/corpus.json"
 BLOB_URL = "https://iq.trunkrecorder.pro/blobs/"
 
@@ -30,4 +29,4 @@ bucket_name = "trp-iq"
 crons = ["17 4 * * *"]
 
 # Secrets (`wrangler secret put`): ADMIN_TOKEN (the corpus-remove workflow's) and
-# GH_DISPATCH_TOKEN (starts the decode job in this repo; only Actions: write).
+# DECODE_TOKEN (the decode job's, to ask what's waiting: this repo's secret of that name).

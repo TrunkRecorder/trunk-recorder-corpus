@@ -8,11 +8,10 @@ import { PAGE } from "./page.ts";
 export interface Env {
   DB: D1Database;
   IQ: R2Bucket;
-  REPO: string;
   MANIFEST_URL: string;
   BLOB_URL: string;
   ADMIN_TOKEN?: string;
-  GH_DISPATCH_TOKEN?: string;
+  DECODE_TOKEN?: string;
 }
 
 const API = "/corpus/api/v1";
@@ -150,14 +149,14 @@ async function complete(req: Request, env: Env, id: string): Promise<Response> {
     await env.DB.prepare("UPDATE files SET upload_id = NULL, parts = '[]' WHERE submission = ? AND name = ?").bind(id, f.name).run();
   }
   await env.DB.prepare("UPDATE submissions SET state = 'received' WHERE id = ?").bind(id).run();
-  if (env.GH_DISPATCH_TOKEN) {
-    await fetch(`https://api.github.com/repos/${env.REPO}/dispatches`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${env.GH_DISPATCH_TOKEN}`, accept: "application/vnd.github+json", "user-agent": "trunk-recorder-corpus" },
-      body: JSON.stringify({ event_type: "submission", client_payload: { id, results_token: s.results_token } }),
-    });
-  }
   return json({ state: "received" });
+}
+
+/** What the decode job has to check. */
+async function pending(req: Request, env: Env): Promise<Response> {
+  if (!env.DECODE_TOKEN || bearer(req) !== env.DECODE_TOKEN) return fail("Not allowed.", 401);
+  const rows = await env.DB.prepare("SELECT id, results_token FROM submissions WHERE state = 'received' ORDER BY created_ms LIMIT 20").all<{ id: string; results_token: string }>();
+  return json({ pending: rows.results });
 }
 
 /** The decode job's verdict. A capture that fails is deleted. */
@@ -238,6 +237,7 @@ async function route(req: Request, env: Env): Promise<Response> {
   if (!path.startsWith(API)) return new Response("Not found", { status: 404 });
   const rest = path.slice(API.length).split("/").filter(Boolean).map(decodeURIComponent);
   if (rest[0] === "installs" && rest.length === 1 && m === "POST") return createInstall(req, env);
+  if (rest[0] === "pending" && rest.length === 1 && m === "GET") return pending(req, env);
   if (rest[0] !== "submissions") return fail("No such API.", 404);
   if (rest.length === 1 && m === "POST") return createSubmission(req, env);
   if (rest.length === 1 && m === "GET") {

@@ -1,26 +1,25 @@
-# Checks a contributed recording: is it what it says it is? It runs the latest
-# released trunk-pro, and publishes a waterfall and counts. Uploads are untrusted input, so this
-# job has no write access to any repo: only a token for its own submission's results.
+# Checks contributed recordings: is each what it says it is? It runs the latest released
+# trunk-pro, and publishes waterfalls and counts. Uploads are untrusted input, so this job has
+# no write access to any repo: only a token to ask what's waiting, and each upload's own for its results.
 name: decode
 
 on:
-  repository_dispatch:
-    types: [submission]
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: decode
+
 jobs:
   decode:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      API: https://trunkrecorder.pro/corpus/api/v1
-      ID: ${{ github.event.client_payload.id }}
-      RESULTS_TOKEN: ${{ github.event.client_payload.results_token }}
+    timeout-minutes: 120
     steps:
-      - name: Keep the token out of the log
-        run: echo "::add-mask::$RESULTS_TOKEN"
+      - uses: actions/checkout@v4
       - name: The latest release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -28,14 +27,7 @@ jobs:
           gh release download --repo TrunkRecorder/trunk-recorder-pro --pattern 'trunk-pro-*-linux-x86_64.tar.gz' --dir /tmp/rel
           tar -xzf /tmp/rel/*.tar.gz -C /tmp/rel
           cp "$(find /tmp/rel -type f -name trunk-pro | head -1)" /tmp/trunk-pro
-      - name: The files
-        run: |
-          case "$ID" in *[!0-9a-f]*|"") echo "Not a submission ID"; exit 1;; esac
-          curl --fail -s -H "Authorization: Bearer $RESULTS_TOKEN" "$API/submissions/$ID" > /tmp/submission.json
-          mkdir -p /tmp/capture
-          python3 scripts/fetch.py /tmp/submission.json /tmp/capture
-      - name: Check it
-        run: /tmp/trunk-pro tool submission /tmp/capture --out /tmp/out || true
-      - name: Report
-        if: always()
-        run: python3 scripts/report.py /tmp/out "$API/submissions/$ID" "$RESULTS_TOKEN"
+      - name: Check what's waiting
+        env:
+          DECODE_TOKEN: ${{ secrets.DECODE_TOKEN }}
+        run: python3 scripts/decode.py /tmp/trunk-pro https://trunkrecorder.pro/corpus/api/v1

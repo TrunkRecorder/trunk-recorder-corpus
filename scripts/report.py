@@ -14,7 +14,10 @@ def send(method, path, data, kind):
 
 
 checks_path = out / "checks.json"
-checks = json.loads(checks_path.read_text()) if checks_path.exists() else {"ok": False, "why": "The check didn't finish."}
+if not checks_path.exists():
+    # (The check itself broke, not the capture: left waiting, for the next run.)
+    sys.exit("No results to report.")
+checks = json.loads(checks_path.read_text())
 if checks.get("ok"):
     for f in sorted(out.glob("waterfall-*.bin")):
         send("PUT", f"/waterfall/{f.stem.split('-')[1]}", f.read_bytes(), "application/octet-stream")

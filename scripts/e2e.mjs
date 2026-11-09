@@ -6,7 +6,8 @@
 
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 
@@ -33,12 +34,27 @@ mkdirSync(join(tmp, "calls/iq-captures"), { recursive: true });
 cpSync(capture, join(tmp, "calls/iq-captures", name), { recursive: true });
 writeFileSync(join(tmp, "config.json"), JSON.stringify({ sources: [], recording: { captureDir: join(tmp, "calls") }, systems: [], server: { bind: "127.0.0.1", port: TRP_PORT } }));
 execFileSync("npx", ["wrangler", "d1", "migrations", "apply", "corpus", "--local", "--persist-to", join(tmp, "wr")], { stdio: "ignore", input: "y\n" });
-const worker = spawn("npx", ["wrangler", "dev", "--port", String(PORT), "--persist-to", join(tmp, "wr"), "--var", `BLOB_URL:${BASE}/blobs/`, "--var", "MANIFEST_URL:http://127.0.0.1:1/none"], { stdio: "ignore", detached: true });
+// GitHub, standing in: a token per user, and what each may do.
+const GITHUB_PORT = 18792, GITHUB = `http://127.0.0.1:${GITHUB_PORT}`;
+const users = { "code-maintainer": { login: "maintainer", push: true }, "code-visitor": { login: "visitor", push: false } };
+const github = createServer(async (q, r) => {
+  const send = (v) => { r.setHeader("content-type", "application/json"); r.end(JSON.stringify(v)); };
+  const user = users[(q.headers.authorization ?? "").replace("Bearer ", "")];
+  if (q.url === "/login/oauth/access_token") {
+    let body = ""; for await (const c of q) body += c;
+    return send({ access_token: JSON.parse(body).code });
+  }
+  if (q.url === "/user") return send({ login: user.login });
+  if (q.url === "/repos/TrunkRecorder/trunk-recorder-pro") return send({ permissions: { push: user.push, admin: false, maintain: false, pull: true } });
+  r.statusCode = 404; r.end();
+}).listen(GITHUB_PORT);
+const worker = spawn("npx", ["wrangler", "dev", "--port", String(PORT), "--persist-to", join(tmp, "wr"), "--var", `BLOB_URL:${BASE}/blobs/`, "--var", "GITHUB_CLIENT_ID:test-id", "--var", "GITHUB_CLIENT_SECRET:test-secret", "--var", `GITHUB_WEB:${GITHUB}`, "--var", `GITHUB_API:${GITHUB}`], { stdio: "ignore", detached: true });
 const env = { ...process.env, TRP_CORPUS_API: API };
 const serve = () => spawn(bin, ["serve", "--config", join(tmp, "config.json"), "--no-open"], { cwd: tmp, env, stdio: "ignore" });
 let trp = serve();
 const cleanup = () => {
   trp.kill();
+  github.close();
   try { process.kill(-worker.pid); } catch {}
 };
 process.on("exit", cleanup);
@@ -107,16 +123,45 @@ const range = await fetch(data.url, { headers: { range: "bytes=10-19" } });
 assert.equal(range.status, 206, "range requests work");
 assert.equal((await range.arrayBuffer()).byteLength, 10);
 
-// Promotion, as the workflow runs it.
-mkdirSync(join(tmp, "corpus"));
-const corpus = ["--manifest", join(tmp, "corpus/corpus.json"), "--cache", join(tmp, "cache"), "--base", `${BASE}/blobs/`];
-execFileSync(bin, ["tool", "corpus", "promote", sent.id, "--api", API, ...corpus], { cwd: tmp, stdio: "ignore" });
-const manifest = JSON.parse(readFileSync(join(tmp, "corpus/corpus.json"), "utf8"));
-assert.equal(manifest.captures[0].id, `s-${sent.id}`);
-assert.ok(existsSync(join(tmp, "corpus/expected", `s-${sent.id}`)), "its first expected output");
+// Signing in is optional: the list is public without it.
+const signIn = async (code) => {
+  const login = await fetch(`${BASE}/auth/login`, { redirect: "manual" });
+  assert.equal(login.status, 302);
+  const state = new URL(login.headers.get("location")).searchParams.get("state");
+  const back = await fetch(`${BASE}/auth/callback?code=${code}&state=${state}`, { redirect: "manual", headers: { cookie: login.headers.get("set-cookie").split(";")[0] } });
+  assert.equal(back.status, 302, "signed in");
+  return back.headers.getSetCookie().find((c) => c.startsWith("corpus_session=")).split(";")[0];
+};
+assert.deepEqual(await (await fetch(`${API}/me`)).json(), { login: null, maintainer: false, can_sign_in: true });
+const post = (path, cookie, body, origin = `http://127.0.0.1:${PORT}`) => fetch(`${API}/submissions/${sent.id}/${path}`, { method: "POST", headers: { cookie, origin, "content-type": "application/json" }, body: JSON.stringify(body ?? {}) });
+assert.equal((await post("promote", "")).status, 401, "not signed in");
+const visitor = await signIn("code-visitor");
+assert.equal((await (await fetch(`${API}/me`, { headers: { cookie: visitor } })).json()).maintainer, false);
+assert.equal((await post("promote", visitor)).status, 403, "no write access");
+const maintainer = await signIn("code-maintainer");
+assert.deepEqual(await (await fetch(`${API}/me`, { headers: { cookie: maintainer } })).json(), { login: "maintainer", maintainer: true, can_sign_in: true });
+assert.equal((await post("promote", maintainer, {}, "https://evil.example")).status, 403, "another site's page");
+assert.equal((await post("review", maintainer, { reviewed: true })).status, 200);
+let shownNow = (await (await fetch(`${API}/submissions`)).json()).submissions[0];
+assert.equal(shownNow.reviewed_by, "maintainer");
+assert.equal(shownNow.has_diagnostics, true);
+assert.equal((await post("promote", maintainer, { state: "known-failing", issue: 42 })).status, 200);
+assert.equal((await post("promote", maintainer)).status, 409, "already a test");
+shownNow = (await (await fetch(`${API}/submissions`)).json()).submissions[0];
+assert.deepEqual([shownNow.regression.state, shownNow.regression.issue, shownNow.regression.promoted_by], ["known-failing", 42, "maintainer"]);
+assert.equal((await post("demote", maintainer)).status, 200);
+assert.equal((await post("promote", maintainer)).status, 200);
+const list = await (await fetch(`${API}/regression`)).json();
+assert.equal(list.captures[0].id, `s-${sent.id}`);
+assert.equal((await fetch(`${API}/submissions/${sent.id}`, { method: "DELETE", headers: { cookie: maintainer, origin: `http://127.0.0.1:${PORT}` } })).status, 409, "a test comes off the list first");
+console.log("signing in and the regression list work");
+
+// What the tests see.
+const corpus = ["--api", API, "--expected", join(tmp, "no-expected-here"), "--cache", join(tmp, "cache"), "--base", `${BASE}/blobs/`];
 const run = execFileSync(bin, ["tool", "corpus", "run", "--out", join(tmp, "after"), ...corpus], { cwd: tmp, encoding: "utf8" });
-assert.match(run, /match/);
-console.log("promoted and matched:", run.trim());
+assert.match(run, /match \(against service/);
+console.log("the tests read the list:", run.trim());
+assert.equal((await post("demote", maintainer)).status, 200);
 
 // Bad uploads.
 const auth = { authorization: `Bearer ${(await (await fetch(`${API}/installs`, { method: "POST" })).json()).token}`, "content-type": "application/json" };

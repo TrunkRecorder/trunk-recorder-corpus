@@ -21,5 +21,9 @@ checks = json.loads(checks_path.read_text())
 if checks.get("ok"):
     for f in sorted(out.glob("waterfall-*.bin")):
         send("PUT", f"/waterfall/{f.stem.split('-')[1]}", f.read_bytes(), "application/octet-stream")
+    # (What a recording decoded to, in case it becomes a test. Hashes and counts.)
+    expected = out / "expected.jsonl"
+    if expected.exists():
+        send("PUT", "/expected", expected.read_bytes(), "text/plain")
 send("POST", "/results", json.dumps({"ok": bool(checks.get("ok")), "checks": checks}).encode(), "application/json")
 print(json.dumps(checks))

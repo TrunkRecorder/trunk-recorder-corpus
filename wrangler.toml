@@ -12,7 +12,7 @@ routes = [{ pattern = "trunkrecorder.pro/corpus*", zone_name = "trunkrecorder.pr
 # Who may promote recordings: anyone with write access to this repo.
 MAINTAINERS_REPO = "TrunkRecorder/trunk-recorder-pro"
 # The GitHub OAuth app people sign in with (optional: without it, the page is read-only).
-GITHUB_CLIENT_ID = ""
+GITHUB_CLIENT_ID = "Ov23liWrTnA3wxDu4Kt6"
 BLOB_URL = "https://iq.trunkrecorder.pro/blobs/"
 
 # Made with `wrangler d1 create corpus`.

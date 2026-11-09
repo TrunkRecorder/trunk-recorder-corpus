@@ -17,7 +17,8 @@ select, input[type=number] { font: inherit; color: var(--text); background: var(
 button, .button { font: inherit; font-size: 13px; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; cursor: pointer; text-decoration: none; display: inline-block; }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .sub { border: 1px solid var(--line); border-radius: 8px; padding: 14px; margin-top: 14px; background: var(--panel); }
-.sub h2 { font-size: 15px; margin: 0; } canvas { width: 100%; height: 170px; image-rendering: pixelated; border-radius: 6px; margin-top: 10px; display: block; background: #000; }
+.sub h2 { font-size: 15px; margin: 0; } canvas { width: 100%; height: 170px; image-rendering: pixelated; border-radius: 6px; margin-top: 4px; display: block; background: #000; }
+.radio { font-size: 13px; color: var(--muted); margin-top: 10px; }
 code, pre { font: 12px ui-monospace, monospace; } pre { white-space: pre-wrap; word-break: break-all; background: var(--bg); padding: 8px; border-radius: 6px; border: 1px solid var(--line); }
 a { color: var(--accent); } .tag { font-size: 12px; border: 1px solid var(--line); border-radius: 99px; padding: 1px 8px; margin-right: 4px; white-space: nowrap; }
 .tag.test { border-color: var(--ok); color: var(--ok); } .tag.debug { border-color: var(--warn); color: var(--warn); }
@@ -106,6 +107,11 @@ function actions(s) {
   }
   return el;
 }
+function waterfallLabel(s, radio, i) {
+  const hz = radio.center_hz ? (radio.center_hz / 1e6).toFixed(4) + " MHz" : "";
+  if (s.tier !== "wideband") return hz ? "Channel at " + hz : "Channel";
+  return "Radio " + (i + 1) + (hz ? " · center " + hz : "");
+}
 function row(s) {
   const c = s.checks || {};
   const el = document.createElement("div"); el.className = "sub";
@@ -117,8 +123,13 @@ function row(s) {
     '<details><summary>Download and replay</summary><pre>' + s.files.map((f) => 'curl -o ' + esc(f.name) + ' ' + esc(f.url)).join("\\n") + '\\ntrunk-pro replay .</pre></details>' +
     '<details><summary>Checks</summary><pre>' + esc(JSON.stringify(c, null, 2)) + '</pre></details>' +
     '<p class="muted">ID <code>' + esc(s.id) + '</code></p>';
-  const n = (c.radios || []).length || 1;
-  for (let i = 0; i < n; i++) { const cv = document.createElement("canvas"); el.insertBefore(cv, el.children[2]); draw(cv, API + "/submissions/" + s.id + "/waterfall/" + i, s.tier !== "wideband"); }
+  const radios = c.radios && c.radios.length ? c.radios : [{}], before = el.children[2];
+  radios.forEach((radio, i) => {
+    const label = document.createElement("div"); label.className = "radio"; label.textContent = waterfallLabel(s, radio, i);
+    const cv = document.createElement("canvas");
+    el.insertBefore(label, before); el.insertBefore(cv, before);
+    draw(cv, API + "/submissions/" + s.id + "/waterfall/" + i, s.tier !== "wideband");
+  });
   if (me.maintainer) el.append(actions(s));
   return el;
 }

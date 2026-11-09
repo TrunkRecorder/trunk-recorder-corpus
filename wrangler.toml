@@ -9,7 +9,10 @@ compatibility_flags = ["nodejs_compat"]
 routes = [{ pattern = "trunkrecorder.pro/corpus*", zone_name = "trunkrecorder.pro" }]
 
 [vars]
-MANIFEST_URL = "https://raw.githubusercontent.com/TrunkRecorder/trunk-recorder-pro/main/corpus/corpus.json"
+# Who may promote recordings: anyone with write access to this repo.
+MAINTAINERS_REPO = "TrunkRecorder/trunk-recorder-pro"
+# The GitHub OAuth app people sign in with (optional: without it, the page is read-only).
+GITHUB_CLIENT_ID = ""
 BLOB_URL = "https://iq.trunkrecorder.pro/blobs/"
 
 # Made with `wrangler d1 create corpus`.
@@ -28,5 +31,5 @@ bucket_name = "trp-iq"
 [triggers]
 crons = ["17 4 * * *"]
 
-# Secrets (`wrangler secret put`): ADMIN_TOKEN (the corpus-remove workflow's) and
+# Secrets (`wrangler secret put`): GITHUB_CLIENT_SECRET (the OAuth app's) and
 # DECODE_TOKEN (the decode job's, to ask what's waiting: this repo's secret of that name).

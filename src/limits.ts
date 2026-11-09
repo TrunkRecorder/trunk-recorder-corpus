@@ -8,6 +8,7 @@ export const BYTES_PER_DAY = 20 * 10 ** 9;
 export const INSTALLS_PER_IP_PER_DAY = 10;
 export const KEEP_DAYS = 90;
 export const MAX_WATERFALL_BYTES = 2 * 10 ** 6;
+export const MAX_EXPECTED_BYTES = 2 * 10 ** 6;
 
 export interface FileIn {
   name: string;
